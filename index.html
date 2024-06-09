@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="user-scalable=no">
+    <title>RunBall</title>
+
+    <!-- подключение файла манифеста, который нужен для установки страницы как обычное приложение -->
+    <link rel="manifest" href="manifest.webmanifest">
+
+    <audio src="seeSound.mp3" autoplay loop></audio>
+
+</head>
+
+<body>
+
+    <!-- для движка -->
+    <canvas id="render-canvas"></canvas>
+
+    <div id="user-interface">
+
+        <img id="restart-btn" class="a-pos" src="assets/restart.png">
+        <img id="coin-img" class="a-pos" src="assets/coin.png">
+        <p id="coin-score" class="a-pos">0</p>
+
+        <div id="nav-bar">
+
+            <img id="shop-icon" src="assets/shop/shop-icon.png">
+            <img id="back-icon" src="assets/shop/back-icon.png">
+
+        </div>
+
+        <div id="play-screen">
+
+            <p id="score" class="a-pos">0</p>
+
+        </div>
+
+        <div id="game-over-screen">
+
+            <p id="game-over-info" class="game-over-p"><b>ИГРА ОКОНЧЕНА</b></p>
+            <p id="best-score" class="game-over-p">ЛУЧШИЙ РЕЗУЛЬТАТ: 0</p>
+            <p id="now-score" class="game-over-p">ТВОЙ РЕЗУЛЬТАТ: 0</p>
+            <p id="tap-info" class="game-over-p">Нажми на экран, чтобы начать сначала</p>
+
+        </div>
+
+        <div id="shop-screen">
+
+            <img id="left-arrow" onclick="arrowClick(-1)" src="assets/shop/left-arrow.png">
+            <img id="right-arrow" onclick="arrowClick(1)" src="assets/shop/right-arrow.png">
+
+            <div id="price-block">
+
+                <img id="lock-icon" src="assets/shop/lock-icon.png">
+                <span id="price">10</span>
+                <img id="price-coin-img" src="assets/coin.png">
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@500&display=swap');
+
+        body,
+        #render-canvas,
+        #user-interface {
+            margin: 0;
+            width: 100%;
+            height: 100%;
+            font-family: "Nunito", sans-serif;
+            user-select: none;
+        }
+
+        /* ---------------------PLAY SCREEN--------------------- */
+        #game-over-screen {
+            display: none;
+        }
+
+        /* нельзя проскроллить вниз */
+        body {
+            position: fixed;
+        }
+
+        #render-canvas {
+            outline: none;
+        }
+
+        .a-pos {
+            position: absolute;
+        }
+
+        #restart-btn {
+            right: 2vh;
+            bottom: 2vh;
+            width: 50px;
+        }
+
+        #coin-img {
+            top: 2vh;
+            right: 2vh;
+            width: 10vh;
+        }
+
+        #coin-score {
+            top: -3vh;
+            right: 13vh;
+            font-size: 6vh;
+        }
+
+        #score {
+            top: 10vh;
+            width: 100%;
+            text-align: center;
+            font-size: 8vh;
+        }
+
+        /* ---------------------GAME OVER SCREEN--------------------- */
+        .game-over-p {
+            position: absolute;
+            width: 100%;
+            text-align: center;
+        }
+
+        #game-over-info {
+            top: 10vh;
+            font-size: 7vh;
+        }
+
+        #best-score {
+            top: 30vh;
+            font-size: 6vh;
+        }
+
+        #now-score {
+            top: 45vh;
+            font-size: 6vh;
+        }
+
+        #tap-info {
+            top: 70vh;
+            font-size: 4vh;
+            animation-name: tap-info_anim;
+            animation-duration: 2s;
+            animation-iteration-count: infinite;
+        }
+
+        /* ---------------------SHOP SCREEN--------------------- */
+        #shop-screen {
+            display: none;
+        }
+
+        #nav-bar,
+        #shop-icon,
+        #back-icon {
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        #shop-icon,
+        #back-icon {
+            width: 10vh;
+            padding: 1vh;
+            display: none;
+        }
+
+        #left-arrow,
+        #right-arrow {
+            position: absolute;
+            top: 60vh;
+            width: 10vh;
+        }
+
+        #left-arrow {
+            left: 20vh;
+        }
+
+        #right-arrow {
+            right: 20vh;
+        }
+
+        #price-block {
+            position: absolute;
+            top: 60vh;
+            left: 0;
+            width: 51%;
+            margin-left: 30%;
+            font-size: 7vh;
+            text-align: center;
+        }
+
+        #lock-icon {
+            width: 25vh;
+            position: relative;
+
+            padding-bottom: 7vh;
+        }
+
+        #price-coin-img {
+            position: relative;
+            width: 5vh;
+            bottom: 0;
+            right: 0;
+        }
+
+        #price {
+            right: 10vh;
+        }
+
+        /* ---------------------анимации--------------------- */
+
+        /* анимация "нажми на экран, чтобы начать сначала" */
+        @keyframes tap-info_anim {
+            from {
+                font-size: 4vh;
+                top: 70vh;
+                opacity: 0.3;
+            }
+
+            to {
+                font-size: 4vh;
+                top: 70vh;
+                opacity: 0.3;
+            }
+
+            50% {
+                font-size: 4.5vh;
+                top: 69vh;
+                opacity: 1;
+            }
+        }
+    </style>
+
+    <!-- подключение движка Babylon.js для работы с 3д графикой -->
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+    <!-- подключение плагина Cannon.js для работы физики -->
+    <script src="https://cdn.babylonjs.com/cannon.js"></script>
+    <!-- подключение скрипта для импорта формата gltf -->
+    <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.js"></script>
+    <!-- подключение скрипта для подключения материала (для воды) -->
+    <script src="https://cdn.babylonjs.com/materialsLibrary/babylon.waterMaterial.js"></script>
+
+
+
+    <script>
+
+
+        // ---------------------СОЗДАНИЕ МИРА--------------------- //
+
+
+        let canvas = window.document.querySelector('#render-canvas');
+
+
+        // создание движка
+        let engine = new BABYLON.Engine(canvas);
+
+
+        // создание сцены и присоединение ее к движку
+        let scene = new BABYLON.Scene(engine)
+        // изменение цвета сцены
+        scene.clearColor = new BABYLON.Color3(0.3, 0.3, 0.3)
+
+
+        // создание физики
+        scene.enablePhysics();
+
+
+        // создание окружающей среды сцены
+        scene.createDefaultEnvironment({
+            // отключение куба, чтобы было видно всю платформу
+            createSkybox: false,
+            // отключение фиолетового круга
+            createGround: false,
+            // изменение контраста
+            cameraContrast: 2,
+            // изменить экспозицию
+            cameraExposure: 1.1
+        });
+
+
+        // создание неба
+        let skybox = new BABYLON.MeshBuilder.CreateBox('skybox', { size: 1000 }, scene);
+        // создание материала для неба
+        let skyboxMaterial = new BABYLON.StandardMaterial('skybox', scene);
+        // добавление текстуры для неба (текстура отражает свет)
+        skyboxMaterial.reflectionTexture = new BABYLON.CubeTexture('assets/environment/TropicalSunnyDay', scene);
+        // чтобы все текстуры отображались корректно
+        skyboxMaterial.reflectionTexture.coordinatesMode = BABYLON.Texture.SKYBOX_MODE;
+        //отрисовка текстур на внутренних гранях
+        skyboxMaterial.backFaceCulling = false; // не убрать внутренние грани
+        // повесить материал на небо
+        skybox.material = skyboxMaterial;
+
+
+        // создание воды
+        let waterGround = new BABYLON.MeshBuilder.CreateGround('ground', { width: 512, height: 512 }, scene); //объект не имеет толщины (нет оси y)
+        // создание материала для воды
+        let waterMaterial = new BABYLON.WaterMaterial('water', scene);
+        // добавление текстуры для воды (текстура для отображения волн)
+        waterMaterial.bumpTexture = new BABYLON.Texture('assets/environment/waterbump.png', scene);
+        // чтоб увидеть волны
+        waterMaterial.addToRenderList(skybox);
+        // повесить материал на воду
+        waterGround.material = waterMaterial;
+        // позиция воды
+        waterGround.position = new BABYLON.Vector3(0, -3, 0);
+        // создание камеры
+        let camera = new BABYLON.FreeCamera('camera', new BABYLON.Vector3(0, 9, -13), scene);
+        // поворот камеры в ту точку, которая указана в параметре
+        camera.setTarget(new BABYLON.Vector3(0, 0, 0));
+
+
+        // создание поверхности морского дна
+        let ground = new BABYLON.MeshBuilder.CreateGround('ground', { width: 100, height: 30 }, scene);
+        // создание материала для поверхности
+        let groundMaterial = new BABYLON.StandardMaterial('material', scene);
+        // добавление текстуры для поверхности
+        groundMaterial.emissiveTexture = new BABYLON.Texture('assets/environment/ground.jpg', scene);
+        // повесить материал на поверхность
+        ground.material = groundMaterial;
+        // позиция поверхности
+        ground.position = new BABYLON.Vector3(0, -5, 13);
+        // чтоб увидеть поверхность
+        waterMaterial.addToRenderList(ground);
+
+
+        // создание света
+        let light = new BABYLON.PointLight('light', new BABYLON.Vector3(10, 10, 0), scene)
+        // яркость света
+        light.intensity = 0.15;
+
+
+        // создание генератора теней
+        let shadowGenerator = new BABYLON.ShadowGenerator(1024, light)
+
+
+        // создание платформы и материала для нее
+        let platformArray = [];
+        const createPlatform = (zPos) => {
+            let platform = new BABYLON.MeshBuilder.CreateBox('box', {
+                width: 12,
+                height: 0.1,
+                depth: 6,
+                wrap: true // поворот платформы
+            }, scene);
+            // создание материала для платформы
+            let boxMaterial = new BABYLON.StandardMaterial('material', scene);
+            // добавление текстуры для платформы
+            boxMaterial.emissiveTexture = new BABYLON.Texture('assets/platform.png')
+            // повесить материал на платформу
+            platform.material = boxMaterial;
+            // платформа - объект, который принимает тень
+            platform.receiveShadows = true;
+            // физика платформы
+            platform.physicsImpostor = new BABYLON.PhysicsImpostor(
+                platform, // объект
+                BABYLON.PhysicsImpostor.BoxImpostor, // тип имитатора физики (сфера)
+                { // набор физических сфойств
+                    mass: 0 // вес
+                },
+                scene
+            );
+            // позиция платформы по оси z
+            platform.position.z = zPos;
+            platformArray.push(platform);
+        }
+
+
+        // создание монетки
+        // пустой масссив, где будут храниться все созданные монетки
+        let coinArray = [];
+        const createCoin = (pos) => {
+            BABYLON.SceneLoader.ImportMesh(
+                null, // набор мешей, если все, то null
+                'assets/coin/',
+                'scene.gltf',
+                scene,
+                // функция после того, как моделька загрузится на сцену
+                (meshArray) => {
+                    let coin = meshArray[0]
+                    // уменьшение монетки
+                    coin.scaling = new BABYLON.Vector3(0.08, 0.08, 0.08);
+                    // изменение позиции монетки
+                    coin.position = pos;
+                    // тень у монетки
+                    shadowGenerator.addShadowCaster(coin);
+                    // монетка - объект, который принимает тень
+                    coin.receiveShadows = true;
+                    // заглушка объекта (добавление в массив)
+                    coinArray.push(coin);
+                    // чтобы не были видны монетки в магазине (чтобы ImportMesh ее был отдельным потоком, синхронизовать его с остальными процессами)
+                    shopIcon.style.display = 'block';
+                }
+
+            )
+        }
+
+
+        // создание препятствий
+        let lastRand = 0;
+        // пустой масссив, где будут храниться все созданные препятствия
+        let boxArray = [];
+        // пустой масссив, где будут храниться все созданные невидимые кубы для счетчика монеток
+        let pointArray = [];
+        // набор цветов для цилиндров
+        let colorArray = [
+            [0.1, 0.2, 0.35],
+            [0.15, 0.25, 0.4],
+            [0.2, 0.3, 0.45],
+            [0.25, 0.35, 0.5],
+            [0.3, 0.4, 0.55],
+        ];
+        // для отслеживания позиции чтоб отображать нужный цвет
+        let colorPos = 0;
+        // для хранения направления цветов
+        let colorDir = 1;
+        const CreateBox = (xPos, zPos) => {
+            let box = new BABYLON.MeshBuilder.CreateCylinder('cone', {
+                diameter: 1.5,
+                height: 2.9,
+                // часть цилиндра
+                arc: 0.5,
+                // закрытый цилиндр
+                enclose: true,
+            }, scene);
+            // позиция препятствия
+            box.position = new BABYLON.Vector3(xPos, 0.3, 6 + zPos);
+            // создание материала для пряпятствия
+            box.material = new BABYLON.StandardMaterial('material', scene);
+            // добавление цвета для препятствия
+            box.material.emissiveColor = new BABYLON.Color3(
+                colorArray[colorPos][0],
+                colorArray[colorPos][1],
+                colorArray[colorPos][2],
+            );
+            // добавление физики для препятствия
+            box.physicsImpostor = new BABYLON.PhysicsImpostor(
+                box, // объект
+                BABYLON.PhysicsImpostor.BoxImpostor, // тип физики
+                { // набор физических свойств
+                    mass: 0
+                },
+                scene
+            );
+            // препятствие - объект, который отбрасываает тень
+            shadowGenerator.getShadowMap().renderList.push(box);
+            // препятствие - объект, который принимает тень
+            box.receiveShadows = true;
+            // заглушка объекта (добавление в массив)
+            boxArray.push(box);
+            // поворот цилиндра
+            box.rotate(new BABYLON.Vector3(0, 0, 1), Math.PI * 0.5, BABYLON.Space.WORLD);
+            box.rotate(new BABYLON.Vector3(1, 0, 0), Math.PI * 0.5, BABYLON.Space.WORLD);
+            // полупрозрачностть
+            box.hasVertexAlpha = true;
+            box.visibility = 0.99;
+        }
+
+
+        // создание ряда препятствий и ряда монеток
+        const CreateBoxRow = (zPos) => {
+            // случайным образом убиралось препятствие, которое не будет отображаться рандомным образом
+            let rand = Math.floor(Math.random() * 3);
+            // цикл для случайной генерации рядов (чтоб каждый ряд был уникальным и нен повторялся с предыдущим)
+            while (rand === lastRand) {
+                rand = Math.floor(Math.random() * 3);
+            }
+            lastRand = rand;
+            // 3 препятствия по горизонтали и монетки
+            for (let i = 0; i < 3; i++) {
+                if (i === rand) {
+                    if (zPos === 30) { //у платформы с данной позицией всегда генерируются монетки
+                        createCoin(new BABYLON.Vector3((i * 4) - 4, 1, 4 + zPos));
+                    }
+                    else if (Math.random() < 0.5) {
+                        createCoin(new BABYLON.Vector3((i * 4) - 4, 1, 4 + zPos)); //отображение монеток в проходах
+                    } else {
+                        //
+                    }
+                    pointArray.push(new BABYLON.Vector3((i * 4) - 4, 0, 4 + zPos));
+                    continue;
+                }
+                CreateBox((i * 4) - 4, zPos);
+            }
+            if (colorPos >= colorArray.length - 1) colorDir = -1;
+            if (colorPos <= 0) colorDir = 1;
+            colorPos += colorDir;
+        }
+        CreateBoxRow();
+
+
+        // создание мяча и материала для него
+        const createBall = (textureNum, needPhysics = true) => {
+            let ball = new BABYLON.MeshBuilder.CreateSphere('sphere', {
+                diameter: 1
+            }, scene);
+            // позиция мяча по оси y
+            ball.position.y = 5.6;
+            // создание материала для мяча
+            let ballMaterial = new BABYLON.StandardMaterial('material', scene);
+            // добавление текстуры для мяча
+            ballMaterial.emissiveTexture = new BABYLON.Texture(`assets/shop/ball/ball${textureNum}.jpg`, scene)
+            // повесить материал на мяч
+            ball.material = ballMaterial;
+            // мяч - объект, который отбрасываает тень
+            shadowGenerator.getShadowMap().renderList.push(ball);
+            // физика мяча
+            // если нужна физика, то включаем ее
+            if (needPhysics) {
+                ball.physicsImpostor = new BABYLON.PhysicsImpostor(
+                    // объект
+                    ball,
+                    // тип имитатора физики (сфера)
+                    BABYLON.PhysicsImpostor.SphereImpostor,
+                    // набор физических сфойств
+                    {
+                        // вес
+                        mass: 1,
+                        // сила столкновения мяча с платформой
+                        // restitution: 4,
+                        // трение, сила сцепления с поверхностьью
+                        friction: 4
+                    },
+                    scene
+                );
+            }
+            return ball;
+        }
+
+
+
+        // ---------------------АЛГОРИТМЫ--------------------- //
+
+
+        // извлечение тегов из разметки
+        let restartBtn = window.document.querySelector('#restart-btn');
+        let scoreInfo = window.document.querySelector('#score');
+        let coinScoreInfo = window.document.querySelector('#coin-score');
+        let playScreen = window.document.querySelector('#play-screen');
+        let gameOverScreen = window.document.querySelector('#game-over-screen');
+        let bestScoreInfo = window.document.querySelector('#best-score');
+        let nowScoreInfo = window.document.querySelector('#now-score');
+        let shopIcon = window.document.querySelector('#shop-icon');
+        let backIcon = window.document.querySelector('#back-icon');
+        let shopScreen = window.document.querySelector('#shop-screen');
+        let priceBlock = window.document.querySelector('#price-block');
+
+
+        // константы
+        const PLAY = 'play';
+        const GAME_OVER = 'game_over';
+        // состояние игры, когда мяч находится в движении
+        const IN_MOVE = 'in_move';
+
+
+        // переменные
+        let ball = null;
+        let score = 0;
+        let coinScore = 0;
+        // текущее состояние (play и game over) игры
+        let state = PLAY;
+        // мяч на старте генерируется в точке 0 по оси x
+        let lastPoint = 0;
+        // координата по оси x первого прохода
+        let nextPoint = 0;
+        // значение скорости
+        let speed = 10;
+        let demoArray = [];
+        let demoTimer = null;
+        // будут храниться текстовые элементы
+        let shopState = ['1', '0', '0', '0', '0']; //1 -товар приобретен, 0 - нет
+        // цены мячей в магазине
+        let priceArray = [100, 120, 160, 190, 250];
+        let activeTexture = 0;
+        let demoPos = 0;
+
+
+        // функции
+
+        // функция вызывается при нажатии одной из стрелок
+        const updatePriceBlock = () => {
+            (shopState[demoPos] === '1') // demoPos - номер активной текстуры для нижего мяча, если товар приобретен
+                ? priceBlock.style.opacity = '0' // товар невидимый (полностью прозрачный)
+                : priceBlock.style.opacity = '1';
+            // отображение корректной цены для выбранного мяча
+            window.document.querySelector('#price').innerText = priceArray[demoPos];
+        }
+
+        // при клике на стрелки меняется текстура мяча в зависимости от порядка номера
+        const arrowClick = (dir) => {
+            // увеличивать или уменьшать значение
+            demoPos += dir;
+
+            if (demoPos < 0) demoPos = 4 // крайний номер текстуры
+            else if (demoPos > 4) demoPos = 0;
+            demoArray[0].material.emissiveTexture = new BABYLON.Texture(`assets/shop/ball/ball${demoPos}.jpg`, scene);
+            updatePriceBlock();
+        }
+
+        // сохранение данных
+        const saveShopState = () => {
+            // хранятся текстовые данные (соединяет элементы массива в одну строку и разделяет их запятой)
+            window.localStorage.setItem('shopState', shopState.join(','));
+            window.localStorage.setItem('activeTexture', activeTexture);
+        }
+
+        // загрузка данных
+        const loadShopState = () => {
+            shopState = (window.localStorage.getItem('shopState')) // если есть такие данные, то сохраняем их
+                ? window.localStorage.getItem('shopState').split(',') // из строки обратно в массив
+                : shopState // если нет таких значений, то возвращаем значение по умолчанию
+            activeTexture = (window.localStorage.getItem('activeTexture')) // сохранение числа в иде строки
+                ? Number.parseInt(window.localStorage.getItem('activeTexture')) // из строки в число
+                : activeTexture;
+                demoPos = activeTexture;
+        }
+
+        //принимает массив, который надо очистить, в функции удаляются элементы
+        const clearArray = (array, isMesh = true) => {
+            // проходится по всем элементам массива, удаляет объекты из сцены (если объект это Mesh, то вызывать функцию dispose)
+            if (isMesh) array.map(elem => elem.dispose());
+            // удаляет последний элемент массива
+            while (array.length) array.pop();
+        }
+
+        //удалить демонстрационные объекты
+        const deleteDemoObjects = () => {
+            clearArray(demoArray);
+            clearInterval(demoTimer);
+        }
+
+        //создать демонстрационные объекты
+        const createDemoObjects = () => {
+            //
+            for (let i = 0; i < 2; i++) {
+                let ball = createBall(activeTexture, false);
+                ball.position = new BABYLON.Vector3(0, i * 3, i * 3);
+                // увеличение мяча
+                ball.scaling = new BABYLON.Vector3(2, 2, 2);
+                demoArray.push(ball);
+            };
+
+            // функция вызывается каждые 20 милисекунд
+            demoTimer = setInterval(() => {
+                // вращение верхнего мяча в магазине
+                demoArray[1].rotate(
+                    new BABYLON.Vector3(-1, 0, -1),
+                    // степень поворота вокруг оси
+                    Math.PI * (engine.getDeltaTime() / 1000), //getDeltaTime - кол-во милисекунд, которые прошли с прошлого обновления сцены
+                    BABYLON.Space.WORLD
+                ) // за 1 секунду полный оборот мяча
+            }, 20);
+            updatePriceBlock();
+        }
+
+        //для удаления
+        const deleteGameObjects = () => {
+            // 3д объект мяча
+            ball.dispose();
+            clearArray(coinArray);
+            clearArray(boxArray);
+            clearArray(platformArray);
+            // это не 3д объекты, а точки
+            clearArray(pointArray, false);
+        }
+
+        //игровые объекты
+        const createGameObjects = () => {
+            // бесконечные цилы
+            for (let i = 0; i < 10; i++) {
+                // увеличение платформы в зависимости от глубины платформы
+                createPlatform(i * 6);
+                if (i === 0) continue;
+                // препятствия по оси z
+                CreateBoxRow(i * 6);
+            }
+
+            lastPoint = 0;
+            nextPoint = pointArray[0].x;
+            // результат работы функции createBall
+            ball = createBall(activeTexture);
+            score = 0;
+            scoreInfo.innerText = `${score}`;
+            speed = 10;
+
+        }
+
+        // функция бесконечного появления платформы и препятствий
+        const newRoadBlock = (zPos) => {
+            createPlatform(zPos * 6);
+            CreateBoxRow(zPos * 6);
+        }
+
+        // функция будет сохранять данные о монетках
+        const saveCoinScore = () => {
+            // после закрытия страницы сохраняет данные в ячейку или создает ее
+            window.localStorage.setItem('coinScore', coinScore);
+        }
+
+        // функция будет загружать данные о монетках
+        const loadCoinScore = () => {
+            // извлекает данные из ячейки, а если нет, то возвращает null
+            coinScore = (window.localStorage.getItem('coinScore'))
+                // если из ячейки возвращается какое-то значение coinScore, тогда это значение будет сохраняться в переменную coinScore
+                ? window.localStorage.getItem('coinScore')
+                // если возвращается null, то отображается 0
+                : 0
+                ;
+            // отображение информации на странице
+            coinScoreInfo.innerText = coinScore;
+        }
+
+        // функция будет сохранять данные о лучшем результате
+        const saveBestScore = () => {
+            window.localStorage.setItem('bestScore', score);
+        }
+
+        // функция будет загружать данные о лучшем результате
+        const loadBestScore = () => {
+
+            return (window.localStorage.getItem('bestScore'))
+                // если в ячейке есть значение, то возвращает его
+                ? window.localStorage.getItem('bestScore')
+                // если в ячейке нет значения, то возвращает 0
+                : 0
+                ;
+        }
+
+        // после конца игры появляется экран с информацией о раунде, в другом случае информация не показывается
+        const setGameOverScreen = () => {
+            state = GAME_OVER;
+            playScreen.style.display = 'none';
+            gameOverScreen.style.display = 'block';
+
+            let bestScore = loadBestScore();
+            // если текущее значение результата > лучшего, то сохраняем новое значение
+            if (score > bestScore) {
+                saveBestScore();
+                bestScore = score;
+            }
+            // сохранение нового результата
+            bestScoreInfo.innerText = `ЛУЧШИЙ РЕЗУЛЬТАТ: ${bestScore}`;
+            nowScoreInfo.innerText = `ТВОЙ РЕЗУЛЬТАТ: ${score}`;
+        }
+        // чтобы каждый раз подгружались данные
+        loadShopState();
+        loadCoinScore();
+        createGameObjects();
+
+
+        // проверки
+        scene.registerBeforeRender(() => {
+
+            // если мяч скатится с платформы, то игра окончена
+            if (ball.getAbsolutePosition().y <= 0) setGameOverScreen();
+
+            // проверяет столкновение одного Mesh с препятствием
+            for (let i = 0; i < boxArray.length; i++) {
+                // если произошло столкновение, препятствие окрашивается в красный
+                if (ball.intersectsMesh(boxArray[i], true)) { //сравнивает столкновение с вершинами объекта
+                    // невидимый виртуальный куб (столкновение мяча с определенной точкой (кубом)) для увеличения счета монеток
+                    ball.intersectsPoint(new BABYLON.Vector3(20, 20, 0));
+                    boxArray[i].material.emissiveColor = new BABYLON.Color3(0.5, 0, 0)
+                    // вызов экрана конца игры
+                    setGameOverScreen();
+                }
+            }
+
+            // проверяет столкновение одного Mesh с монеткой
+            for (let i = 0; i < coinArray.length; i++) {
+                // если произошло столкновение, монетка исчезает
+                if (ball.intersectsMesh(coinArray[i], false)) {
+                    // увеличиваем число монеток на единицу
+                    coinScore++
+                    coinScoreInfo.innerText = coinScore;
+                    saveCoinScore();
+                    coinArray[i].dispose();
+                    coinArray.splice(i, 1);
+                }
+            }
+
+            // проверяет столкновение одного Mesh с невидимым блоком
+            for (let i = 0; i < pointArray.length; i++) {
+                // если столкновение произошлоло, то увеличиваем счет на 1
+                if (ball.intersectsPoint(pointArray[i])) {
+                    // обновление значений lastPoint и nextPoint
+                    // текущий проход
+                    lastPoint = pointArray[i].x
+                    // следующий проход
+                    nextPoint = pointArray[i + 1].x
+                    // удаление одного компонента из массива
+                    pointArray.splice(i, 1);
+                    score++;
+                    scoreInfo.innerText = score;
+                    // если длина массива <=6, то генерируем новый блок 
+                    if (pointArray.length <= 4) {
+                        newRoadBlock((pointArray[pointArray.length - 1].z + 2) / 6)
+                    }
+                }
+            }
+
+
+            // движение неба
+            skybox.position.z = ball.getAbsolutePosition().z;
+            // движение воды
+            waterGround.position.z = ball.getAbsolutePosition().z;
+            // движение поверхности
+            ground.position.z = ball.getAbsolutePosition().z + 13;
+            // движение камеры вперед
+            camera.position.z = ball.getAbsolutePosition().z - 10;
+            // движение света вперед
+            light.position.z = ball.getAbsolutePosition().z;
+
+
+        });
+
+
+        // для запуска функции +- 60 раз/сек для постоянного рендера сцены
+        engine.runRenderLoop(() => {
+            // отображение сцены
+            scene.render()
+        });
+
+
+        // ---------------------ОБРАБОТЧИКИ СОБЫТИЙ--------------------- //
+
+        // ЧИТЫ))))
+        window.localStorage.setItem('coinScore', 300000);
+        // window.localStorage.setItem('bestScore', 1);
+
+        // перезагрузка страницы
+        restartBtn.addEventListener('click', () => window.location.reload());
+
+        // покупка товаров
+        priceBlock.addEventListener('click', () => {
+            //если товар не куплен
+            if (shopState[demoPos] === '0') {
+                // если средств достаточно, то записываются изменения
+                if (priceArray[demoPos] <= coinScore) {
+                    coinScore -= priceArray[demoPos];
+                    coinScoreInfo.innerText = coinScore;
+                    saveCoinScore();
+                    // установить значение 1 (приобретено)
+                    shopState[demoPos] = '1';
+                    saveShopState();
+                    updatePriceBlock();
+                }
+            } else { // если куплен
+                activeTexture = demoPos;
+                saveShopState();
+                demoArray[1].material.emissiveTexture = new BABYLON.Texture(`assets/shop/ball/ball${activeTexture}.jpg`, scene);
+            }
+        })
+
+        // при нажатии на кнопку магазин, она убирается, появляется стрелка
+        shopIcon.addEventListener('click', () => {
+
+            if (state != IN_MOVE) {
+
+                shopIcon.style.display = 'none';
+                backIcon.style.display = 'block';
+                // скрываем счет
+                playScreen.style.display = 'none';
+                shopScreen.style.display = 'block';
+                demoPos = activeTexture;
+                // удаляем игровые элементы
+                deleteGameObjects();
+                createDemoObjects();
+            }
+        });
+
+        // при нажатии на кнопку стрелки, она убирается, появляется магазин
+        backIcon.addEventListener('click', () => {
+            backIcon.style.display = 'none';
+            shopIcon.style.display = 'block';
+            shopScreen.style.display = 'none';
+            // показываем счет
+            playScreen.style.display = 'block';
+            // создаем игровые элементы
+            deleteDemoObjects();
+            createGameObjects();
+        })
+
+
+        // действие мяча в начале клике
+        // window.addEventListener('click', (event) => {
+        //     // если состояние игры не конец, то можно производить действия с мячом
+        //     if (state !== GAME_OVER) {
+        //         let x = event.screenX;
+        //         // если x > половины ширины экрана (правая сторона экрана)
+        //         if (x > (window.screen.width / 2)) {
+        //             ball.physicsImpostor.applyImpulse(
+        //                 // вектор импульса вправо
+        //                 new BABYLON.Vector3(10, 0, 0),
+        //                 // место, куда мы прикладываем импульс
+        //                 ball.getAbsolutePosition()
+        //             );
+        //         } else {
+        //             ball.physicsImpostor.applyImpulse(
+        //                 // вектор импульса влево
+        //                 new BABYLON.Vector3(-10, 0, 0),
+        //                 // место, куда мы прикладываем импульс
+        //                 ball.getAbsolutePosition()
+        //             );
+        //         }
+        //     } else {
+        //         // при нажатии на экран страница перезагружается
+        //         window.location.reload();
+        //     }
+        // });
+
+
+        // действие мяча при (клике)
+        window.addEventListener('click', (event) => {
+            // остановка мяча
+            // линейная скорость мяча
+            // ball.physicsImpostor.setLinearVelocity(new BABYLON.Vector3(0, 0, 6))
+            // скорость вращения мяча
+            // ball.physicsImpostor.setAngularVelocity(new BABYLON.Vector3(0, 0, 0))
+
+            // если игра окончена, то перезагрузки страницы нет (удаляются объекты и создаются по новой при новом раунде)
+            if (state === GAME_OVER) {
+                // отключение повдение по умолчанию, чтобы всем остальным элементам в случае выполнения блока событие клика не передавалось дальше
+                event.preventDefault();
+                gameOverScreen.style.display = 'none';
+                deleteGameObjects();
+                createGameObjects();
+                playScreen.style.display = 'block';
+                state = PLAY;
+                shopIcon.style.opacity = '1';
+                // если клик находится на определенной позиции (больше 30% от высоты экрана), то вызываем следующий блок (мяч не двигается)
+            } else if (event.screenY > 0.3 * window.screen.height) { // передвигаем мяч
+                if (ball.getAbsolutePosition().z === 0) { // если мяч находится на стартовой позиции, то установим линейную скоростть
+                    ball.physicsImpostor.setLinearVelocity(new BABYLON.Vector3(0, 0, speed));
+                    state = IN_MOVE;
+                    shopIcon.style.opacity = '0'; //если началась игра
+                } else { // иначе если мяч передвинулся, то кликаем влево или вправо
+                    if (lastPoint > nextPoint) {
+                        //влево
+                        ball.translate(new BABYLON.Vector3(-2, 0, 0), 1, BABYLON.Space.WORLD); //вектор направления, коэф.направления, система отсчета
+                    } else if (lastPoint < nextPoint) {
+                        //вправо
+                        ball.translate(new BABYLON.Vector3(2, 0, 0), 1, BABYLON.Space.WORLD); //вектор направления, коэф.направления, система отсчета
+                    }
+                    // с каждым кликом по экрану скорость увеличивается
+                    speed += speed * 0.01;
+                    // увеличение линейной скорости мяча
+                    ball.physicsImpostor.setLinearVelocity(new BABYLON.Vector3(0, 0, speed));
+                    // торможение скорости вращения
+                    ball.physicsImpostor.setAngularVelocity(new BABYLON.Vector3(0, 0, 0));
+
+                }
+
+            }
+        });
+
+
+        // событие, связанное с установкой
+        window.addEventListener('beforeinstallprompt', (event) => {
+            // отмена действия по умолчанию
+            event.preventDefault();
+        });
+
+    </script>
+
+</body>
+
+</html>
